@@ -128,7 +128,7 @@ function VersionMenu({ version, onUpdate, onDelete }: {
             ))}
             <div className="border-t border-[#e8ddd2]" />
             <button
-              onClick={() => { if (confirm('确定删除此版本？')); onDelete(version.id); setOpen(false); }}
+              onClick={() => { if (confirm('确定删除此版本？')) onDelete(version.id); setOpen(false); }}
               className="w-full text-left px-4 py-2.5 text-sm text-[#c0392b] hover:bg-[#fdf0ef] cursor-pointer"
             >
               删除版本
@@ -164,9 +164,15 @@ async function syncIdeaToNotion(id: string, status: string, category: string, ve
     if (!res.ok) {
       const data = await res.json();
       logger.warn('board:sync', `同步失败 id=${id}: ${data.error || res.status}`);
+      throw new Error(data.error || '同步失败');
     }
   } catch (e) {
-    logger.warn('board:sync', `请求异常 id=${id}: ${e}`);
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes('同步失败')) {
+      logger.warn('board:sync', `请求异常 id=${id}: ${e}`);
+      throw new Error('网络异常，同步失败');
+    }
+    throw e;
   }
 }
 
@@ -184,9 +190,15 @@ async function deleteIdeaFromNotion(id: string): Promise<void> {
     if (!res.ok) {
       const data = await res.json();
       logger.warn('board:trash', `删除失败 id=${id}: ${data.error || res.status}`);
+      throw new Error(data.error || '删除失败');
     }
   } catch (e) {
-    logger.warn('board:trash', `请求异常 id=${id}: ${e}`);
+    const msg = e instanceof Error ? e.message : String(e);
+    if (!msg.includes('删除失败')) {
+      logger.warn('board:trash', `请求异常 id=${id}: ${e}`);
+      throw new Error('网络异常，删除失败');
+    }
+    throw e;
   }
 }
 
@@ -249,16 +261,16 @@ export function RoadmapInteractiveBoard({ initialVersions, initialIdeas, initial
 
     // Add to target
     if (isTrash) {
-      deleteIdeaFromNotion(item.id);
+      deleteIdeaFromNotion(item.id).catch(e => alert('删除失败: ' + e.message));
       return;
     }
 
     if (isIdeasZone) {
       setIdeas(prev => [...prev, { ...item, status: 'Ideas', category: 'Uncategorized', versionId: undefined }]);
-      syncIdeaToNotion(item.id, 'Ideas', 'Uncategorized', null);
+      syncIdeaToNotion(item.id, 'Ideas', 'Uncategorized', null).catch(e => alert('同步失败: ' + e.message));
     } else if (isBacklogZone) {
       setBacklog(prev => [...prev, { ...item, status: 'Backlog', category: 'Uncategorized', versionId: undefined }]);
-      syncIdeaToNotion(item.id, 'Backlog', 'Uncategorized', null);
+      syncIdeaToNotion(item.id, 'Backlog', 'Uncategorized', null).catch(e => alert('同步失败: ' + e.message));
     } else if (isCategoryZone) {
       const [versionId, catKey] = overIdStr.split('__');
       const category = catKey as CategoryKey;
@@ -270,7 +282,7 @@ export function RoadmapInteractiveBoard({ initialVersions, initialIdeas, initial
         }
         return v;
       }));
-      syncIdeaToNotion(item.id, 'Scheduled', category, versionId);
+      syncIdeaToNotion(item.id, 'Scheduled', category, versionId).catch(e => alert('同步失败: ' + e.message));
     }
   };
 
@@ -316,7 +328,8 @@ export function RoadmapInteractiveBoard({ initialVersions, initialIdeas, initial
         body: JSON.stringify({ id, status }),
       });
     } catch (e) {
-      console.error('更新状态失败:', e);
+      logger.error('board:version-status', `更新失败: ${e}`);
+      alert('更新版本状态失败');
     }
   };
 
@@ -329,7 +342,8 @@ export function RoadmapInteractiveBoard({ initialVersions, initialIdeas, initial
         body: JSON.stringify({ id }),
       });
     } catch (e) {
-      console.error('删除版本失败:', e);
+      logger.error('board:delete-version', `删除失败: ${e}`);
+      alert('删除版本失败');
     }
   };
 
@@ -484,7 +498,11 @@ export function RoadmapInteractiveBoard({ initialVersions, initialIdeas, initial
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ content: idea.content }),
         });
-        if (!res.ok) throw new Error('创建失败');
+        if (!res.ok) {
+          const errData = await res.json();
+          alert('创建灵感失败: ' + (errData.error || '未知错误'));
+          return;
+        }
         const data = await res.json();
         setIdeas(prev => [...prev, { ...idea, id: data.id }]);
       } catch {
