@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@notionhq/client';
+import { logger } from '@/lib/logger';
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY! });
 
@@ -37,10 +38,10 @@ export async function POST(request: Request) {
       properties,
     });
 
-    console.log('✅ 版本创建成功:', response.id);
+    logger.info('api:versions', `创建成功 id=${response.id} v=${version}`);
     return NextResponse.json({ id: response.id, version, commit, status: 'Planned', visibleCategories });
   } catch (error: any) {
-    console.error('❌ 创建版本失败:', error?.body?.message || error?.message);
+    logger.error('api:versions', `创建失败: ${error?.body?.message || error?.message}`);
     return NextResponse.json({ error: error?.body?.message || error?.message || '创建失败' }, { status: 500 });
   }
 }

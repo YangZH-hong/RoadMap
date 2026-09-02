@@ -1,5 +1,6 @@
 import { Client } from '@notionhq/client';
 import { VersionItem, VersionStatus, IdeaItem, IdeaStatus } from '@/types/roadmap';
+import { logger } from './logger';
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY! });
 
@@ -15,11 +16,10 @@ async function getAllIdeas(): Promise<IdeaItem[]> {
   if (!ideasDbId) return [];
 
   try {
-    // 使用 search API 查询 Ideas 数据库的所有页面
     const response: any = await notion.search({
       filter: { property: 'object', value: 'page' },
     });
-    
+
     return (response.results || [])
       .map((page: any) => {
         const props = page.properties;
@@ -34,7 +34,7 @@ async function getAllIdeas(): Promise<IdeaItem[]> {
       })
       .filter(Boolean) as IdeaItem[];
   } catch (e) {
-    console.error('查询灵感表失败:', e);
+    logger.error('notion:ideas', `查询灵感表失败: ${e}`);
     return [];
   }
 }
@@ -57,7 +57,7 @@ export async function getRoadmapVersion(): Promise<VersionItem[]> {
       const version = props.Version?.title?.[0]?.plain_text || '0.0';
       const commit = props.Commit?.rich_text?.[0]?.plain_text || '';
       const status = (props.Status?.select?.name as VersionStatus) || 'Planned';
-      
+
       const versionIdeas = scheduledIdeas.filter((i: IdeaItem) => i.versionId === page.id);
 
       const visibleRaw = props.VisibleCategories?.multi_select?.map((s: any) => s.name) || [];
@@ -81,7 +81,7 @@ export async function getRoadmapVersion(): Promise<VersionItem[]> {
       };
     }).sort((a: VersionItem, b: VersionItem) => parseFloat(b.version) - parseFloat(a.version));
   } catch (e) {
-    console.error('查询版本表失败:', e);
+    logger.error('notion:versions', `查询版本表失败: ${e}`);
     return [];
   }
 }

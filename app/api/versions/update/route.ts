@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@notionhq/client';
+import { logger } from '@/lib/logger';
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY! });
 
@@ -17,15 +18,13 @@ export async function POST(request: Request) {
 
     await notion.pages.update({
       page_id: formatId(id),
-      properties: {
-        Status: { select: { name: status } },
-      },
+      properties: { Status: { select: { name: status } } },
     });
 
-    console.log('✅ 版本状态更新:', { id, status });
+    logger.info('api:versions', `状态更新 id=${id} status=${status}`);
     return NextResponse.json({ success: true });
   } catch (error: any) {
-    console.error('❌ 更新版本失败:', error?.body?.message || error?.message);
+    logger.error('api:versions', `更新失败: ${error?.body?.message || error?.message}`);
     return NextResponse.json({ error: error?.body?.message || error?.message || '更新失败' }, { status: 500 });
   }
 }

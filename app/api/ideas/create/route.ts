@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { Client } from '@notionhq/client';
+import { logger } from '@/lib/logger';
 
 const notion = new Client({ auth: process.env.NOTION_API_KEY! });
 
@@ -22,9 +23,10 @@ export async function POST(request: Request) {
       },
     });
 
+    logger.info('api:ideas', `创建成功 id=${response.id}`);
     return NextResponse.json({ id: response.id });
   } catch (error: any) {
-    console.error('创建灵感失败:', error);
+    logger.error('api:ideas', `创建失败: ${error?.body?.message || error?.message}`);
     return NextResponse.json({ error: error.message || '创建失败' }, { status: 500 });
   }
 }

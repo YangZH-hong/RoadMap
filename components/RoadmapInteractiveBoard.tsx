@@ -15,6 +15,7 @@ import {
   DragEndEvent,
 } from '@dnd-kit/core';
 import { VersionItem, IdeaItem, CategoryKey, VersionStatus } from '@/types/roadmap';
+import { logger } from '@/lib/logger';
 import { StatusBadge } from './StatusBadge';
 import { CreateIdeaModal } from './CreateIdeaModal';
 import { CreateVersionModal } from './CreateVersionModal';
@@ -162,22 +163,30 @@ async function syncIdeaToNotion(id: string, status: string, category: string, ve
     });
     if (!res.ok) {
       const data = await res.json();
-      console.error('同步失败:', data.error);
+      logger.warn('board:sync', `同步失败 id=${id}: ${data.error || res.status}`);
     }
   } catch (e) {
-    console.error('同步失败:', e);
+    logger.warn('board:sync', `请求异常 id=${id}: ${e}`);
   }
 }
 
 async function deleteIdeaFromNotion(id: string): Promise<void> {
   try {
-    await fetch('/api/ideas/delete', {
+    if (id.startsWith('temp-')) {
+      logger.warn('board:trash', `跳过删除临时灵感 id=${id}`);
+      return;
+    }
+    const res = await fetch('/api/ideas/delete', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ id }),
     });
+    if (!res.ok) {
+      const data = await res.json();
+      logger.warn('board:trash', `删除失败 id=${id}: ${data.error || res.status}`);
+    }
   } catch (e) {
-    console.error('删除失败:', e);
+    logger.warn('board:trash', `请求异常 id=${id}: ${e}`);
   }
 }
 
@@ -274,7 +283,7 @@ export function RoadmapInteractiveBoard({ initialVersions, initialIdeas, initial
       });
       if (!res.ok) {
         const errData = await res.json();
-        console.error('创建版本API错误:', errData.error);
+        logger.error('board:create-version', `API错误: ${errData.error}`);
         alert('创建失败: ' + (errData.error || '未知错误'));
         return;
       }
@@ -294,7 +303,7 @@ export function RoadmapInteractiveBoard({ initialVersions, initialIdeas, initial
 
       setVersions(prev => [newVersion, ...prev]);
     } catch (e) {
-      console.error('创建版本失败:', e);
+      logger.error('board:create-version', `异常: ${e}`);
     }
   };
 
